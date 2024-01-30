@@ -1,0 +1,86 @@
+##1 Generate the Dataset based on the variables of "Verdienststrukturerhebung 2018"
+# Firstly generating the dataset for the further imputation Case Study
+
+import numpy as np
+import pandas as pd
+from sklearn.impute import SimpleImputer, KNNImputer
+from sklearn.linear_model import LinearRegression
+
+# Re-creating the original_data DataFrame with missing values
+# (This is necessary as the code execution state was reset)
+
+np.random.seed(0)  # Seed for reproducibility
+
+# Generate 'Age' data
+age_data = np.random.randint(18, 70, 500)
+
+# Generate 'Income' data with a linear relationship to 'Age'
+income_data = 1000 * age_data + np.random.normal(0, 10000, 500)
+
+# Introduce missing data at random (15% missing)
+def introduce_missing_data_at_random(data, missing_percentage):
+    total_data_points = data.size
+    total_missing = int(total_data_points * missing_percentage / 100)
+    flat_indices = np.arange(total_data_points)
+    missing_indices = np.random.choice(flat_indices, total_missing, replace=False)
+    row_indices, col_indices = np.unravel_index(missing_indices, data.shape)
+    data.values[row_indices, col_indices] = np.nan
+
+original_data = pd.DataFrame({
+    'Income': income_data,
+    'Age': age_data
+})
+introduce_missing_data_at_random(original_data, 15)
+
+##2 Do a scatter plot to have a look at the data
+
+# Scatter plot of Income vs. Age from the original_data DataFrame to show linear relationship between the two variables
+
+plt.figure(figsize=(10, 6))
+plt.scatter(original_data['Age'], original_data['Income'], alpha=0.6, s=80)
+plt.title('Scatter Plot of Age vs. Income')
+plt.xlabel('Age')
+plt.ylabel('Income')
+plt.grid(True)
+plt.show()
+
+
+##3 Set up Imputations for MAR values
+#Imputation techniques: 4different imputation techniques (mean, nearest neighbor, and linear regression) are computed:
+
+
+# Set up the imputation methods for meanimputation and kNN
+mean_imputer = SimpleImputer(strategy='mean')  # For mean imputation
+knn_imputer = KNNImputer(n_neighbors=5)       # For KNN imputation
+
+# Application of Mean Imputation
+original_data['Income_Mean'] = mean_imputer.fit_transform(original_data[['Income']])
+
+# Apply kNN Imputation
+original_data['Income_KNN'] = knn_imputer.fit_transform(original_data[['Income']])
+
+# Separate the data for Linear Regression Imputation
+train_data = original_data.dropna(subset=['Income'])
+missing_data = original_data[original_data['Income'].isnull()]
+
+# Check if there are missing values to be imputed
+if not missing_data.empty:
+    # Create a linear regression model
+    lr_model = LinearRegression()
+
+    # Fit the model on the data without missing values
+    lr_model.fit(train_data[['Age']], train_data['Income'])
+
+    # Predict the missing 'Income' values
+    predicted_income = lr_model.predict(missing_data[['Age']])
+
+    # Fill in the missing values in the original data
+    original_data.loc[original_data['Income'].isnull(), 'Income_LR'] = predicted_income
+else:
+    # Indicate that there's no missing data for linear regression imputation
+    original_data['Income_LR'] = np.nan
+    print("No missing 'Income' data to impute using Linear Regression.")
+
+# Display the head of the DataFrame
+original_data[['Income', 'Income_Mean', 'Income_KNN', 'Income_LR']].head()
+
