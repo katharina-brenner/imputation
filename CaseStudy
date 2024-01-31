@@ -84,3 +84,98 @@ else:
 # Display the head of the DataFrame
 original_data[['Income', 'Income_Mean', 'Income_KNN', 'Income_LR']].head()
 
+
+# Apply simple mean imputation
+mean_imputer = SimpleImputer(strategy='mean')
+original_data['Income_Mean'] = mean_imputer.fit_transform(original_data[['Income']])
+
+# Scatter plot to visualize the original and mean imputed data
+plt.figure(figsize=(12, 6))
+
+# Original data points
+plt.scatter(original_data['Age'], original_data['Income'], alpha=0.5, label='Original Data', color='dodgerblue')
+
+# Mean imputed data points
+plt.scatter(original_data['Age'], original_data['Income_Mean'], alpha=0.5, label='Mean Imputed Data', color='orange')
+
+plt.title('Comparison of Original and Mean Imputed Income Data')
+plt.xlabel('Age')
+plt.ylabel('Income')
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+
+##Improved/new version: 
+
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.experimental import enable_iterative_imputer
+from sklearn.impute import SimpleImputer, KNNImputer, IterativeImputer
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.linear_model import LinearRegression
+from sklearn.metrics import mean_squared_error
+
+# Generated synthetic dataset with linear relationship and introduce missing data
+np.random.seed(0)
+age_data = np.random.randint(18, 70, 500)
+income_data = 1000 * age_data + np.random.normal(0, 10000, 500)
+
+original_data = pd.DataFrame({
+    'Age': age_data,
+    'Income': income_data
+})
+
+def introduce_missing_data_at_random(data, missing_percentage):
+    np.random.seed(0)
+    n_missing = int(len(data) * missing_percentage / 100)
+    missing_indices = np.random.choice(data.index, n_missing, replace=False)
+    data.loc[missing_indices, 'Income'] = np.nan
+
+introduce_missing_data_at_random(original_data, 15)
+
+# Simple Mean Imputation
+mean_imputer = SimpleImputer(strategy='mean')
+original_data['Income_Mean'] = mean_imputer.fit_transform(original_data[['Income']])
+
+# Simple Regression Imputation
+linreg = LinearRegression()
+linreg.fit(original_data[['Age']][original_data['Income'].notnull()], original_data['Income'].dropna())
+original_data['Income_Reg'] = original_data['Income']
+reg_pred = linreg.predict(original_data[['Age']][original_data['Income'].isnull()])
+original_data.loc[original_data['Income'].isnull(), 'Income_Reg'] = reg_pred
+
+# Simple kNN Imputation
+knn_imputer = KNNImputer(n_neighbors=5)
+original_data['Income_KNN'] = knn_imputer.fit_transform(original_data[['Income']])
+
+# Multiple Imputation with Random Forest
+rf_imputer = IterativeImputer(estimator=RandomForestRegressor(n_estimators=10), random_state=0, max_iter=10, initial_strategy='mean')
+original_data['Income_RF'] = rf_imputer.fit_transform(original_data[['Income']])
+
+# Plotting the results
+plt.figure(figsize=(20, 5))
+for i, method in enumerate(['Income_Mean', 'Income_Reg', 'Income_KNN', 'Income_RF'], 1):
+    plt.subplot(1, 4, i)
+    sns.scatterplot(data=original_data, x='Age', y='Income', color='blue', alpha=0.5)
+    sns.scatterplot(data=original_data, x='Age', y=method, color='red', alpha=0.5)
+    plt.title(f'Scatter Plot with {method.split("_")[1]} Imputation')
+    plt.xlabel('Age')
+    plt.ylabel('Income')
+
+plt.tight_layout()
+plt.show()
+
+# Comparing variances
+variances = {method: original_data[method].var() for method in ['Income', 'Income_Mean', 'Income_Reg', 'Income_KNN', 'Income_RF']}
+print(variances)
+
+# Boxplot of the different imputation methods
+plt.figure(figsize=(12, 6))
+sns.boxplot(data=original_data[['Income', 'Income_Mean', 'Income_Reg', 'Income_KNN', 'Income_RF']])
+plt.title('Boxplot of Imputation Methods')
+plt.show()
+
